@@ -17,12 +17,22 @@ namespace Backend {
  */
 class SimpleLRU : public Afina::Storage {
 public:
-    SimpleLRU(size_t max_size = 1024) : _max_size(max_size) {} // TODO: больше предустановок
+    SimpleLRU(size_t max_size = 1024) :
+    _max_size(max_size), _size(0), _lru_head(nullptr) {}
 
     ~SimpleLRU() {
         _lru_index.clear();
-        _lru_head.reset(); // TODO: Here is stack overflow
+        auto ptr = _lru_head;
+        while (ptr->next != nullptr) {
+            ptr = ptr->next;
+            ptr->prev.reset();
+        }
     }
+
+    bool PutNew(const std::string &key, const std::string &value);
+
+
+    bool PutOld(const std::string &key, const std::string &value);
 
     // Implements Afina::Storage interface
     bool Put(const std::string &key, const std::string &value) override;
@@ -36,6 +46,9 @@ public:
     // Implements Afina::Storage interface
     bool Delete(const std::string &key) override;
 
+
+    bool DeleteLast();
+
     // Implements Afina::Storage interface
     bool Get(const std::string &key, std::string &value) const override;
 
@@ -47,7 +60,7 @@ private:
         std::unique_ptr<lru_node> prev;
         std::unique_ptr<lru_node> next;
 
-        lru_node(const std::string &key, const std::string &value :
+        lru_node(const std::string &key, const std::string &value) :
         key(key), value(value), prev(nullptr), next(nullptr) {}
 
         ~lru_node() {}
@@ -56,6 +69,7 @@ private:
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size
     std::size_t _max_size;
+    std::size_t _size;
 
     // Main storage of lru_nodes, elements in this list ordered descending by "freshness": in the head
     // element that wasn't used for longest time.
