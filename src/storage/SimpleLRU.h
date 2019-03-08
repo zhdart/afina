@@ -21,12 +21,12 @@ public:
     _max_size(max_size), _size(0), _lru_head(nullptr) {}
 
     ~SimpleLRU() {
-        _lru_index.clear();
         auto ptr = _lru_head;
         while (ptr->next != nullptr) {
             ptr = ptr->next;
             ptr->prev.reset();
         }
+        _lru_index.clear();
     }
 
     bool PutNew(const std::string &key, const std::string &value);
@@ -49,6 +49,9 @@ public:
 
     bool DeleteLast();
 
+
+    bool Update(const std::string &key);
+
     // Implements Afina::Storage interface
     bool Get(const std::string &key, std::string &value) const override;
 
@@ -57,8 +60,8 @@ private:
     using lru_node = struct lru_node {
         std::string key;
         std::string value;
-        std::unique_ptr<lru_node> prev;
-        std::unique_ptr<lru_node> next;
+        std::shared_ptr<lru_node> prev;
+        std::shared_ptr<lru_node> next;
 
         lru_node(const std::string &key, const std::string &value) :
         key(key), value(value), prev(nullptr), next(nullptr) {}
@@ -75,7 +78,7 @@ private:
     // element that wasn't used for longest time.
     //
     // List owns all nodes
-    std::unique_ptr<lru_node> _lru_head;
+    std::shared_ptr<lru_node> _lru_head;
 
     // Index of nodes from list above, allows fast random access to elements by lru_node#key
     std::map<std::reference_wrapper<std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;

@@ -6,10 +6,13 @@ namespace Backend {
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::PutNew(const std::string &key, const std::string &value) { //TODO
     const size_t insert_memory = key.size() + value.size();
+    if (insert_memory > _max_size)
+        return false;
     while (_max_size - _size < insert_memory) {
         if (_lru_head == nullptr)
             return false;
         DeleteLast();
+        _size -= insert_memory;
     }
 
 }
@@ -19,8 +22,6 @@ bool SimpleLRU::PutOld(const std::string &key, const std::string &value) { //TOD
 }
 
 bool SimpleLRU::Put(const std::string &key, const std::string &value) {
-    if (key.size() + value.size() > _max_size)
-        return false;
     if(_lru_index.find(key) != _lru_index.end())
         return PutOld(key, value);
     return PutNew(key, value);
@@ -28,8 +29,6 @@ bool SimpleLRU::Put(const std::string &key, const std::string &value) {
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
-    if (key.size() + value.size() > _max_size)
-        return false;
     if (_lru_index.find(key)!=_lru_index.end())
         return false;
     return PutNew(key, value);
@@ -37,10 +36,8 @@ bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Set(const std::string &key, const std::string &value) {
-    if (key.size() + value.size() > _max_size)
-        return false;
     if (_lru_index.find(key) == _lru_index.end())
-        return false
+        return false;
     return PutOld(key, value);
 }
 
@@ -49,14 +46,14 @@ bool SimpleLRU::Delete(const std::string &key) { //TODO (+-)
     if (_lru_head == nullptr)
         return false;
     auto tmp_iter = _lru_index.find(key);
+    auto tmp_ptr = tmp_iter->second.get();
     if (tmp_ptr == _lru_index.end())
         return false;
-    auto tmp_ptr = tmp_iter->second.get();
     auto prev_ptr = tmp_ptr.prev;
     auto next_ptr = tmp_ptr.next;
-    auto value = tmp_ptr->value;
-    auto key = tmp_ptr->value;
-    std::size_t deleted_memory = key.size() + value.size();
+    auto tmp_value = tmp_ptr->value;
+    auto tmp_key = tmp_ptr->value;
+    std::size_t deleted_memory = tmp_key.size() + tmp_value.size();
     if(tmp_ptr == _lru_head)
         return DeleteLast();
     prev_ptr.next = next_ptr;
@@ -80,6 +77,11 @@ bool SimpleLRU::DeleteLast() { //TODO (+-)
     _size -= deleted_memory;
     return true;
 }
+
+bool SimpleLRU::Update(const std::string &key) { //TODO
+    return false;
+}
+
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Get(const std::string &key, std::string &value) const { //TODO
     if (_lru_head == nullptr)
@@ -88,7 +90,7 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) const { //TODO
     if (tmp_iter == _lru_index.end())
         return false;
     value = tmp_iter->second.get().value;
-    RefreshList(key); // TODO
+    Update(key); // TODO
     return true;
 }
 
