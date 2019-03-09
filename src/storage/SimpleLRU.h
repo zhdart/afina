@@ -18,21 +18,20 @@ namespace Backend {
 class SimpleLRU : public Afina::Storage {
 public:
     SimpleLRU(size_t max_size = 1024) :
-    _max_size(max_size), _size(0), _lru_head(nullptr) {}
+    _max_size(max_size), _size(0), _lru_head(nullptr), _lru_tail(nullptr) {}
 
     ~SimpleLRU() {
-        auto ptr = _lru_head;
-        while (ptr->next != nullptr) {
-            ptr = ptr->next;
-            ptr->prev.reset();
+        if (_lru_head != nullptr) {
+            while (_lru_head->next != nullptr) {
+                std::unique_ptr<lru_node> tmp_ptr(nullptr);
+                tmp_ptr.swap(_lru_head->next);
+                _lru_head.swap(tmp_ptr);
+                tmp_ptr.reset();
+            }
         }
+        _lru_head.reset();
         _lru_index.clear();
     }
-
-    bool PutNew(const std::string &key, const std::string &value);
-
-
-    bool PutOld(const std::string &key, const std::string &value);
 
     // Implements Afina::Storage interface
     bool Put(const std::string &key, const std::string &value) override;
@@ -46,12 +45,6 @@ public:
     // Implements Afina::Storage interface
     bool Delete(const std::string &key) override;
 
-
-    bool DeleteLast();
-
-
-    bool Update(const std::string &key);
-
     // Implements Afina::Storage interface
     bool Get(const std::string &key, std::string &value) const override;
 
@@ -60,8 +53,8 @@ private:
     using lru_node = struct lru_node {
         std::string key;
         std::string value;
-        std::shared_ptr<lru_node> prev;
-        std::shared_ptr<lru_node> next;
+        lru_node *prev; //TODO ??
+        std::unique_ptr<lru_node> next;
 
         lru_node(const std::string &key, const std::string &value) :
         key(key), value(value), prev(nullptr), next(nullptr) {}
@@ -78,10 +71,23 @@ private:
     // element that wasn't used for longest time.
     //
     // List owns all nodes
-    std::shared_ptr<lru_node> _lru_head;
+    std::unique_ptr<lru_node> _lru_head;
+    lru_node *_lru_tail; //TODO мб не нужен
 
     // Index of nodes from list above, allows fast random access to elements by lru_node#key
-    std::map<std::reference_wrapper<std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;
+    std::map<std::reference_wrapper<const std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;
+
+
+    bool PutNew(const std::string &key, const std::string &value);
+
+
+    bool PutOld(const std::string &key, const std::string &value);
+
+
+    bool DeleteLast();
+
+
+    bool Update(lru_node &new_node);
 };
 
 } // namespace Backend
