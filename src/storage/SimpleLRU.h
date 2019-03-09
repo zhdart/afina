@@ -46,7 +46,7 @@ public:
     bool Delete(const std::string &key) override;
 
     // Implements Afina::Storage interface
-    bool Get(const std::string &key, std::string &value) const override;
+    bool Get(const std::string &key, std::string &value) override;
 
 private:
     // LRU cache node
@@ -56,10 +56,11 @@ private:
         lru_node *prev; //TODO ??
         std::unique_ptr<lru_node> next;
 
-        lru_node(const std::string &key, const std::string &value) :
+        /*lru_node(const std::string &key, const std::string &value) :
         key(key), value(value), prev(nullptr), next(nullptr) {}
 
         ~lru_node() {}
+         */
     };
 
     // Maximum number of bytes could be stored in this cache.
