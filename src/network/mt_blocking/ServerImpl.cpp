@@ -38,7 +38,7 @@ ServerImpl::~ServerImpl() {}
 void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
     _logger = pLogging->select("network");
     _logger->info("Start mt_blocking network service");
-    //TODO _n_workers = n_workers;
+    _n_workers = n_workers;
 
     sigset_t sig_mask;
     sigemptyset(&sig_mask);
@@ -93,15 +93,7 @@ void ServerImpl::Join() {
 
 // See Server.h
 void ServerImpl::OnRun() {
-    // Here is connection state
-    // - parser: parse state of the stream
-    // - command_to_execute: last command parsed out of stream
-    // - arg_remains: how many bytes to read from stream to get command argument
-    // - argument_for_command: buffer stores argument
-    std::size_t arg_remains;
-    Protocol::Parser parser;
-    std::string argument_for_command;
-    std::unique_ptr<Execute::Command> command_to_execute;
+
     while (running.load()) {
         _logger->debug("waiting for connection...");
 
@@ -136,18 +128,38 @@ void ServerImpl::OnRun() {
 
         // TODO: Start new thread and process data from/to connection
         {
-            static const std::string msg = "TODO: start new thread and process memcached protocol instead";
-            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-                _logger->error("Failed to write response to client: {}", strerror(errno));
+            std::lock_guard<std::mutex> _lock(_mutex);
+            if (_threads.size() == _n_workers) {
+                close(client_socket);
+                _logger->debug("All workers are busy");
+            } else {
+                _threads.emplace_front(std::thread());
+                _threads.front() = std::thread(&ServerImpl::WorkerOnRun, this, client_socket, pStorage.get(),
+                                               _threads.begin());
             }
-            close(client_socket);
         }
+    }
+
+    {
+        std::unique_lock<std::mutex> _lock(_mutex);
+        _cond_var.wait(_lock, [this](){ return _threads.empty(); });
     }
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }
 
-void ServerImpl::WorkerOnRun() {
+void ServerImpl::WorkerOnRun(int client_socket, Afina::Storage *pStorage, std::list<std::thread>::iterator iter) {
+
+    // Here is connection state
+    // - arg_remains: how many bytes to read from stream to get command argument
+    // - parser: parse state of the stream
+    // - argument_for_command: buffer stores argument
+    // - command_to_execute: last command parsed out of stream
+
+    std::size_t arg_remains;
+    Protocol::Parser parser;
+    std::string argument_for_command;
+    std::unique_ptr<Execute::Command> command_to_execute;
 
     try {
         int readed_bytes = -1;
@@ -229,11 +241,22 @@ void ServerImpl::WorkerOnRun() {
     // We are done with this connection
     close(client_socket);
 
+    {
+        std::lock_guard<std::mutex> _lock(_mutex);
+        iter->detach();
+        _threads.erase(iter);
+        if (_threads.empty() &&!running.load()) {
+            _cond_var.notify_all();
+        }
+    }
+
+    // TODO ??
+    /*
     // Prepare for the next command: just in case if connection was closed in the middle of executing something
     command_to_execute.reset();
     argument_for_command.resize(0);
     parser.Reset();
-}
+    */
 }
 
 } // namespace MTblocking
