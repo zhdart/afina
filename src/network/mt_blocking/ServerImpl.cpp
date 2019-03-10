@@ -133,22 +133,21 @@ void ServerImpl::OnRun() {
                 close(client_socket);
                 _logger->debug("All workers are busy");
             } else {
-                _threads.emplace_front(std::thread());
-                _threads.front() = std::thread(&ServerImpl::WorkerOnRun, this, client_socket, pStorage.get(),
-                                               _threads.begin());
+                _threads.emplace_front(&ServerImpl::WorkerOnRun, this, client_socket, _threads.begin());
             }
         }
     }
 
     {
         std::unique_lock<std::mutex> _lock(_mutex);
-        _cond_var.wait(_lock, [this](){ return _threads.empty(); });
+        auto f = [this](){return _threads.empty();};
+        _cond_var.wait(_lock, f);
     }
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }
 
-void ServerImpl::WorkerOnRun(int client_socket, Afina::Storage *pStorage, std::list<std::thread>::iterator iter) {
+void ServerImpl::WorkerOnRun(int client_socket, std::list<std::thread>::iterator iter) {
 
     // Here is connection state
     // - arg_remains: how many bytes to read from stream to get command argument
@@ -249,14 +248,6 @@ void ServerImpl::WorkerOnRun(int client_socket, Afina::Storage *pStorage, std::l
             _cond_var.notify_all();
         }
     }
-
-    // TODO ??
-    /*
-    // Prepare for the next command: just in case if connection was closed in the middle of executing something
-    command_to_execute.reset();
-    argument_for_command.resize(0);
-    parser.Reset();
-    */
 }
 
 } // namespace MTblocking
