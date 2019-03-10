@@ -165,6 +165,8 @@ void ServerImpl::OnRun() {
         // - read commands until socket alive
         // - execute each command
         // - send response
+
+        // TODO start convert to mt_blocking
         try {
             int readed_bytes = -1;
             char client_buffer[4096];
@@ -250,7 +252,7 @@ void ServerImpl::OnRun() {
         argument_for_command.resize(0);
         parser.Reset();
     }
-
+        // TODO Stop convert to mt_blocking
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }

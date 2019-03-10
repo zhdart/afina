@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <thread>
+#include <mutex>
 
 #include <afina/network/Server.h>
 
@@ -52,6 +53,10 @@ private:
 
     // Thread to run network on
     std::thread _thread;
+
+    int _n_workers;
+
+    std::mutex _mutex;
 };
 
 } // namespace MTblocking
