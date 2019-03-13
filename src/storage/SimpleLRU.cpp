@@ -38,13 +38,13 @@ bool SimpleLRU::Delete(const std::string &key) {
     }
     std::unique_ptr<lru_node> tmp_ptr;
     lru_node &tmp_node = tmp_iter->second;
-    if (_lru_head.get() == &tmp_node)
-        return DeleteLast();
+    //if (_lru_head.get() == &tmp_node)
+    //    return DeleteLast();
     size_t deleted_size = tmp_node.key.size() + tmp_node.value.size();
-    if (tmp_node.next) {
+    if (tmp_node.next != nullptr) {
         tmp_node.next->prev = tmp_node.prev;
     }
-    if (tmp_node.prev) {
+    if (tmp_node.prev != nullptr) {
         tmp_ptr.swap(tmp_node.prev->next);
         tmp_node.prev->next = std::move(tmp_node.next);
     } else {
@@ -111,14 +111,15 @@ bool SimpleLRU::DeleteLast() {
     if (_lru_head == nullptr) {
         return false;
     }
-    size_t deleted_size = _lru_head.get()->key.size() + _lru_head.get()->value.size();
+    lru_node *tmp_node = _lru_head.get();
+    size_t deleted_size = tmp_node->key.size() + tmp_node->value.size();
     std::unique_ptr<lru_node> tmp_ptr;
-    if (_lru_head.get()->next != nullptr) {
-        _lru_head.get()->next->prev = _lru_head.get()->prev;
+    if (tmp_node->next != nullptr) {
+        tmp_node->next->prev = tmp_node->prev;
     }
     tmp_ptr.swap(_lru_head);
-    _lru_head = std::move(_lru_head.get()->next);
-    _lru_index.erase(_lru_head.get()->key);
+    _lru_head = std::move(tmp_node->next);
+    _lru_index.erase(tmp_node->key);
     _size -= deleted_size;
     return true;
 }
