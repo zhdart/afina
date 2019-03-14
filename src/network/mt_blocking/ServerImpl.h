@@ -60,11 +60,11 @@ private:
 
     std::mutex _mutex;
 
-    std::list<std::thread> _threads;
+    int _cur_n_workers = 0;
 
     std::condition_variable _cond_var;
 
-    void WorkerOnRun(int socket, std::list<std::thread>::iterator iter);
+    void WorkerOnRun(int socket);
 };
 
 } // namespace MTblocking

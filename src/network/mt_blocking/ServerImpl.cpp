@@ -126,28 +126,29 @@ void ServerImpl::OnRun() {
             setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
         }
 
-        // TODO: Start new thread and process data from/to connection
         {
             std::lock_guard<std::mutex> _lock(_mutex);
-            if (_threads.size() == _n_workers) {
+            if (_cur_n_workers >= _n_workers) {
                 close(client_socket);
                 _logger->debug("All workers are busy");
             } else {
-                _threads.emplace_front(&ServerImpl::WorkerOnRun, this, client_socket, _threads.begin());
+                ++_cur_n_workers;
+                std::thread cur_thread (&ServerImpl::WorkerOnRun, this, client_socket);
+                cur_thread.detach();
             }
         }
     }
 
     {
         std::unique_lock<std::mutex> _lock(_mutex);
-        auto f = [this](){return _threads.empty();};
+        auto f = [this](){return _cur_n_workers = 0; };
         _cond_var.wait(_lock, f);
     }
     // Cleanup on exit...
     _logger->warn("Network stopped");
 }
 
-void ServerImpl::WorkerOnRun(int client_socket, std::list<std::thread>::iterator iter) {
+void ServerImpl::WorkerOnRun(int client_socket) {
 
     // Here is connection state
     // - arg_remains: how many bytes to read from stream to get command argument
@@ -242,9 +243,8 @@ void ServerImpl::WorkerOnRun(int client_socket, std::list<std::thread>::iterator
 
     {
         std::lock_guard<std::mutex> _lock(_mutex);
-        iter->detach();
-        _threads.erase(iter);
-        if (_threads.empty() &&!running.load()) {
+        --_cur_n_workers;
+        if (_cur_n_workers == 0 &&!running.load()) {
             _cond_var.notify_all();
         }
     }
