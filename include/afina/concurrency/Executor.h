@@ -30,7 +30,7 @@ class Executor {
 
     Executor(std::string name, int low_watermark, int high_watermark,
             int max_queue_size, std::chrono::milliseconds idle_time) :
-            _low_watermark(low_watermark), _high_watermark(high_watermark),
+            _name(name), _low_watermark(low_watermark), _high_watermark(high_watermark),
             _max_queue_size(max_queue_size), _idle_time(idle_time) {};
     ~Executor() {};
 
@@ -61,8 +61,8 @@ class Executor {
 
             // Enqueue new task
             _tasks.push_back(exec);
-        }
 
+        }
         _empty_condition.notify_one();
         return true;
     }
@@ -103,6 +103,8 @@ private:
      * Flag to stop bg threads
      */
     State _state;
+
+    std::string _name;
 
     int _low_watermark;
 
