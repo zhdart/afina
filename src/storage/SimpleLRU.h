@@ -53,7 +53,7 @@ private:
     using lru_node = struct lru_node {
         std::string key;
         std::string value;
-        lru_node *prev; //TODO ??
+        lru_node *prev;
         std::unique_ptr<lru_node> next;
 
         lru_node(const std::string &key, const std::string &value) :
@@ -72,7 +72,7 @@ private:
     //
     // List owns all nodes
     std::unique_ptr<lru_node> _lru_head;
-    lru_node *_lru_tail; //TODO мб не нужен
+    lru_node *_lru_tail;
 
     // Index of nodes from list above, allows fast random access to elements by lru_node#key
     std::map<std::reference_wrapper<const std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;
@@ -81,7 +81,8 @@ private:
     bool PutNew(const std::string &key, const std::string &value);
 
 
-    bool PutOld(const std::string &key, const std::string &value);
+    bool PutOld(std::map<std::reference_wrapper<const std::string>, std::reference_wrapper<lru_node>,
+            std::less<std::string>>::iterator tmp_iter, const std::string &value);
 
 
     bool DeleteLast();

@@ -5,8 +5,9 @@ namespace Backend {
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Put(const std::string &key, const std::string &value) { // ++
-    if(_lru_index.find(key) != _lru_index.end()) {
-        return PutOld(key, value);
+    auto tmp_iter = _lru_index.find(key);
+    if(tmp_iter != _lru_index.end()) {
+        return PutOld(tmp_iter, value);
     }
     return PutNew(key, value);
 }
@@ -21,10 +22,11 @@ bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) { 
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Set(const std::string &key, const std::string &value) { // ++
-    if (_lru_index.find(key) == _lru_index.end()) {
+    auto tmp_iter = _lru_index.find(key);
+    if (tmp_iter == _lru_index.end()) {
         return false;
     }
-    return PutOld(key, value);
+    return PutOld(tmp_iter, value);
 }
 
 // See MapBasedGlobalLockImpl.h
@@ -91,8 +93,8 @@ bool SimpleLRU::PutNew(const std::string &key, const std::string &value) {
     return true;
 }
 
-bool SimpleLRU::PutOld(const std::string &key, const std::string &value) { //TODO убрать второй поиск
-    auto tmp_iter = _lru_index.find(key);
+bool SimpleLRU::PutOld(std::map<std::reference_wrapper<const std::string>, std::reference_wrapper<lru_node>,
+        std::less<std::string>>::iterator tmp_iter, const std::string &value) {
     lru_node &tmp_node = tmp_iter->second;
     size_t put_size = value.size() - tmp_node.value.size();
     if (put_size > _max_size) {
