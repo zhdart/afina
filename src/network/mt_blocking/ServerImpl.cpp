@@ -82,6 +82,11 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 void ServerImpl::Stop() {
     running.store(false);
     shutdown(_server_socket, SHUT_RDWR);
+
+    while (!_worker_sockets.empty()) {
+        shutdown(_worker_sockets.front(), SHUT_RDWR);
+        _worker_sockets.pop_front();
+    }
 }
 
 // See Server.h
@@ -94,10 +99,12 @@ void ServerImpl::Join() {
 // See Server.h
 void ServerImpl::OnRun() {
 
+
     while (running.load()) {
         _logger->debug("waiting for connection...");
 
         // The call to accept() blocks until the incoming connection arrives
+
         int client_socket;
         struct sockaddr client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
@@ -132,8 +139,9 @@ void ServerImpl::OnRun() {
                 close(client_socket);
                 _logger->debug("All workers are busy");
             } else {
+                _worker_sockets.push_front(client_socket);
                 ++_cur_n_workers;
-                std::thread cur_thread (&ServerImpl::WorkerOnRun, this, client_socket);
+                std::thread cur_thread (&ServerImpl::WorkerOnRun, this, client_socket, _worker_sockets.begin());
                 cur_thread.detach();
             }
         }
@@ -148,7 +156,7 @@ void ServerImpl::OnRun() {
     _logger->warn("Network stopped");
 }
 
-void ServerImpl::WorkerOnRun(int client_socket) {
+void ServerImpl::WorkerOnRun(int client_socket, std::list<int>::iterator client_socket_iter) {
 
     // Here is connection state
     // - arg_remains: how many bytes to read from stream to get command argument
@@ -244,6 +252,7 @@ void ServerImpl::WorkerOnRun(int client_socket) {
     {
         std::lock_guard<std::mutex> _lock(_mutex);
         --_cur_n_workers;
+        _worker_sockets.erase(client_socket_iter);
         if (_cur_n_workers == 0 &&!running.load()) {
             _cond_var.notify_all();
         }

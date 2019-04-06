@@ -64,7 +64,9 @@ private:
 
     std::condition_variable _cond_var;
 
-    void WorkerOnRun(int socket);
+    std::list<int> _worker_sockets;
+
+    void WorkerOnRun(int socket, std::list<int>::iterator client_socket_iter);
 };
 
 } // namespace MTblocking
