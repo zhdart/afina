@@ -81,12 +81,15 @@ void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
 // See Server.h
 void ServerImpl::Stop() {
     running.store(false);
-    while (!_worker_sockets.empty()) {
-        shutdown(_worker_sockets.front(), SHUT_RDWR);
-        _worker_sockets.pop_front();
+    {
+        std::lock_guard<std::mutex> _lock(_mutex);
+        while (!_worker_sockets.empty()) {
+            close(_worker_sockets.front());
+            shutdown(_worker_sockets.front(), SHUT_RDWR);
+            _worker_sockets.pop_front();
+        }
     }
     shutdown(_server_socket, SHUT_RDWR);
-
 }
 
 // See Server.h
@@ -247,10 +250,10 @@ void ServerImpl::WorkerOnRun(int client_socket, std::list<int>::iterator client_
     }
 
     // We are done with this connection
-    close(client_socket);
 
     {
         std::lock_guard<std::mutex> _lock(_mutex);
+        close(client_socket);
         --_cur_n_workers;
         _worker_sockets.erase(client_socket_iter);
         if (_cur_n_workers == 0 &&!running.load()) {
